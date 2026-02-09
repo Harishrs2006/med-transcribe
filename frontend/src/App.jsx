@@ -5,6 +5,9 @@ export default function App() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Step 2 (temporary): store URL returned by backend after upload
+  const [transcript, setTranscript] = useState("");
+
   async function uploadAudio() {
     if (!file) {
       setResult("❌ Please choose an audio file first.");
@@ -13,10 +16,12 @@ export default function App() {
 
     setLoading(true);
     setResult("Uploading...");
+    setTranscript("");
 
     try {
       const form = new FormData();
-      form.append("audio", file); // must match upload.single("audio") in backend
+      // MUST match multer upload.single("audio") in backend
+      form.append("audio", file);
 
       const res = await fetch("http://localhost:5000/api/upload-audio", {
         method: "POST",
@@ -25,9 +30,15 @@ export default function App() {
 
       const text = await res.text(); // read raw text first
 
-      // Try parse JSON, otherwise show the HTML/error text
+      // Try parse JSON, otherwise show HTML/error text
       try {
         const data = JSON.parse(text);
+
+        // If backend returns { ok, filename, url }
+        if (data?.url) {
+          setTranscript(data.url);
+        }
+
         setResult("✅ Upload success:\n" + JSON.stringify(data, null, 2));
       } catch {
         setResult("❌ Backend did not return JSON:\n\n" + text);
@@ -41,18 +52,27 @@ export default function App() {
 
   return (
     <div style={{ padding: 24, fontFamily: "Arial" }}>
-      <h1>🎙️ Medical Transcription App</h1>
+      <h1 style={{ marginBottom: 6 }}>🎙️ Medical Transcription App</h1>
 
-      <p>Step 8: Upload audio to backend</p>
+      <p style={{ marginTop: 0, opacity: 0.85 }}>
+        Step 8: Upload audio to backend
+      </p>
 
       <input
         type="file"
         accept="audio/*"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
 
       <div style={{ marginTop: 12 }}>
-        <button onClick={uploadAudio} disabled={loading}>
+        <button
+          onClick={uploadAudio}
+          disabled={loading}
+          style={{
+            padding: "10px 14px",
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
           {loading ? "Uploading..." : "Upload Audio"}
         </button>
       </div>
@@ -64,10 +84,25 @@ export default function App() {
           background: "#111",
           color: "#0f0",
           whiteSpace: "pre-wrap",
+          borderRadius: 8,
         }}
       >
         {result}
       </pre>
+
+      {transcript && (
+        <div style={{ marginTop: 16 }}>
+          <h3>Transcript (temporary)</h3>
+          <p style={{ marginTop: 6, opacity: 0.85 }}>
+            Currently showing the uploaded file URL (later we’ll replace this
+            with real text transcription).
+          </p>
+
+          <a href={transcript} target="_blank" rel="noreferrer">
+            {transcript}
+          </a>
+        </div>
+      )}
     </div>
   );
 }
